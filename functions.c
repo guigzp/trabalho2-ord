@@ -12,7 +12,7 @@ getLine (char *str, FILE *arq){
 }
 
 int btopen(){
-	btfd = fopen("btree.txt", "r+");
+	btfd = fopen("btree.txt", "rb+");
 	return (btfd == NULL);
 }
 
@@ -44,7 +44,7 @@ pageInit(btpage* pagina){
 }
 
 int createTree(){
-	btfd = fopen("btree.txt", "w");
+	btfd = fopen("btree.txt", "wb");
 	fclose(btfd);
 	btopen();
 	return createRoot(NIL, NIL, NIL, NIL);
@@ -70,13 +70,10 @@ btwrite(int rrn, btpage* page){
 	fwrite(page, PAGESIZE, 1, btfd);
 }
 
-btpage* btread(int rrn){
-	btpage *aux;
-	aux = (btpage*)calloc(1, PAGESIZE);
+void btread(int rrn, btpage *aux){
 	int offset = (rrn * PAGESIZE) + 4;
 	fseek(btfd, offset, SEEK_SET);
 	fread(aux, PAGESIZE, 1, btfd);
-	return aux;
 }
 
 int search_node(int key, btpage *p_page, int *pos){
@@ -117,36 +114,70 @@ printaPage (btpage *page){
 
 insert (int rrn, int key, int *promo_r_child, int *promo_key)
 {
-    btpage *page,         /* current page                      */
-           newpage;      /* new page created if split occurs  */
-    int found, promoted; /* boolean values                    */
-    int  pos,
-           p_b_rrn;      /* rrn promoted from below           */
-    int   p_b_key;      /* key promoted from below           */
+    btpage page, newpage;
+    int found, promoted, pos, p_b_rrn, p_b_key;
 
-    if (rrn == NIL) {           /* past bottom of tree... "promote" */
-        *promo_key = key;       /* original key so that it will be  */
-        *promo_r_child = NIL;   /* inserted at leaf level           */
-        return (YES);	  
+    if (rrn == NIL) {
+        *promo_key = key; 
+        *promo_r_child = NIL;
+        return YES;	  
     }
-    page = btread(rrn);          
-    found = search_node(key, page, &pos);
+    
+    btread(rrn, &page);        
+    found = search_node(key, &page, &pos);
+    
     if (found) {
-    	printf("Error: attempt to insert duplicate key: %c \n\007", key);
-    	return (0);
+    	printf("Erro, chave duplicada: %d \n", key);
+    	return 0;
     }
-    promoted = insert(page->filhos[pos], key, &p_b_rrn, &p_b_key);
+    promoted = insert(page.filhos[pos], key, &p_b_rrn, &p_b_key);
     if (!promoted)
-    	return (NO);  /* no promotion */
-    if (page->qtd_chaves < MAXKEYS) {                  
-    	ins_in_page(p_b_key, p_b_rrn, page);   /* OK to insert key and  */
-    	btwrite(rrn, page);                    /* pointer in this page. */
-    	return (NO);  /* no promotion */
+    	return NO;
+    if (page.qtd_chaves < MAXKEYS) {                  
+    	ins_in_page(p_b_key, p_b_rrn, &page);
+    	btwrite(rrn, &page);              
+    	return NO;
     }
     else {
-    	//split(p_b_key, p_b_rrn, &page, promo_key, promo_r_child, &newpage);
-    	btwrite(rrn, page);
+    	split(p_b_key, p_b_rrn, &page, promo_key, promo_r_child, &newpage);
+    	btwrite(rrn, &page);
     	btwrite(*promo_r_child, &newpage);
-    	return (YES);   /* promotion */
+    	return YES;
     }
+}
+
+split(int key, int r_child, btpage *p_oldpage, int *promo_key, int *promo_r_child, btpage *p_newpage)
+{
+    int i, mid, workkeys[MAXKEYS+1], workch[MAXKEYS+2];
+
+    for (i=0; i < MAXKEYS; i++) {        
+	workkeys[i] = p_oldpage->chaves[i]; 
+	workch[i] = p_oldpage->filhos[i];
+    }
+    
+    workch[i] = p_oldpage->filhos[i];    
+	         
+    for (i=MAXKEYS; key < workkeys[i-1] && i > 0; i--) {
+        workkeys[i] = workkeys[i-1];
+        workch[i+1] = workch[i];
+    }
+    workkeys[i] = key;
+    workch[i+1] = r_child;
+
+    *promo_r_child = getPage();            
+    pageInit(p_newpage);                   
+
+    for (i = 0; i < MINKEYS; i++) {        
+    	p_oldpage->chaves[i] = workkeys[i];   
+		p_oldpage->filhos[i] = workch[i];   
+		p_newpage->chaves[i] = workkeys[i+1+MINKEYS];
+        p_newpage->filhos[i] = workch[i+1+MINKEYS];
+		p_oldpage->chaves[i+MINKEYS] = NIL;     
+		p_oldpage->filhos[i+1+MINKEYS] = NIL;
+	}
+    p_oldpage->filhos[MINKEYS] = workch[MINKEYS];
+    p_newpage->filhos[MINKEYS] = workch[i+1+MINKEYS];
+    p_newpage->qtd_chaves = MAXKEYS - MINKEYS;
+    p_oldpage->qtd_chaves = MINKEYS;
+    *promo_key = workkeys[MINKEYS];    
 }
