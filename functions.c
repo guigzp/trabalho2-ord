@@ -47,18 +47,21 @@ int createTree(){
 	btfd = fopen("btree.txt", "wb");
 	fclose(btfd);
 	btopen();
-	return createRoot(NIL, NIL, NIL, NIL);
+	return createRoot(NIL, NIL, NIL, NIL, 1);
 }
 
-int createRoot(int key, int offset, int left, int right){
+int createRoot(int key, int offset, int left, int right, int primeira){
 	btpage page;
-	int rrn = 0;
+	int rrn = getPage();
 	pageInit(&page);
 	page.chaves[0] = key;
 	page.filhos[0] = left;
 	page.filhos[1] = right;
 	page.offsets[0] = offset;
-	page.qtd_chaves = 0;
+	page.qtd_chaves = 1;
+	if(primeira){
+		page.qtd_chaves = 0;
+	}
 	btwrite(rrn, &page);
 	putRoot(rrn);
 	return rrn;	
@@ -164,7 +167,7 @@ split(int key, int r_child, btpage *p_oldpage, int *promo_key, int *promo_r_chil
     workkeys[i] = key;
     workch[i+1] = r_child;
 
-    *promo_r_child = getPage();            
+    *promo_r_child = getPage();          
     pageInit(p_newpage);                   
 
     for (i = 0; i < MINKEYS; i++) {        
