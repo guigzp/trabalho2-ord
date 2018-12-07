@@ -7,6 +7,7 @@ int main(){
     root = createTree();
   	int promo_rrn, promo_key, promo_offset, promoted;
   	btpage aux;
+  	/*
   	promoted = insert(root, 10, 4, &promo_rrn, &promo_key, &promo_offset); 
   	promoted = insert(root, 13,3, &promo_rrn, &promo_key, &promo_offset);
   	promoted = insert(root, 12, 1, &promo_rrn, &promo_key, &promo_offset);
@@ -31,5 +32,7 @@ int main(){
   	printf("Pagina 3\n");
   	btread(3, &aux);
   	printaPage(&aux);
+  	*/
+  	importarArquivo();
     btclose();
 }

@@ -11,6 +11,34 @@ getLine (char *str, FILE *arq){
 	str[i] = '\0';	// adiciona o fim de string
 }
 
+importarArquivo(){
+	char nome_arquivo[50], buffer[100], string[20];
+	int quantidade, i, j, id, offset = 2;
+	printf("Digite o nome do arquivo a ser importado: ");
+	scanf("%s", nome_arquivo);
+	printf("%s\n", nome_arquivo);
+	FILE* arq = fopen(nome_arquivo, "r");
+	if(arq == NULL){
+		printf("Falha na abertura do arquivo!\n");
+	}else{
+		getLine(string, arq);
+		quantidade = atoi(string);
+		for(i = 0; i < quantidade; i++){
+			for(j = 0; j < 4; j++){
+				getLine(string, arq);
+				if(j == 0){
+					id = atoi(string);
+				}
+				strcat(buffer, string);
+			}
+			printf("ID: %d | Offset: %d\n", id, offset);
+			offset = offset + strlen(buffer);		// calcula o offset de cada registro
+			buffer[0] = '\0';						// limpa o buffer
+			// inserir(id, offset);
+		}
+	}
+}
+
 int btopen(){
 	btfd = fopen("btree.txt", "rb+");
 	return (btfd == NULL);

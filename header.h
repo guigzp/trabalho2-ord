@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define MAXKEYS 4
 #define MINKEYS MAXKEYS/2
