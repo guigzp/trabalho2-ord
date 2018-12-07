@@ -90,15 +90,17 @@ int search_node(int key, btpage *p_page, int *pos){
 	}
 }
 
-ins_in_page(int key, int r_child, btpage *p_page){
+ins_in_page(int key, int offset, int r_child, btpage *p_page){
     int i;
     for (i = p_page->qtd_chaves; key < p_page->chaves[i-1] && i > 0; i--) {
         p_page->chaves[i] = p_page->chaves[i-1];
         p_page->filhos[i+1] = p_page->filhos[i];
+        p_page->offsets[i] = p_page->offsets[i-1];
     }
     p_page->qtd_chaves++;
     p_page->chaves[i] = key;
     p_page->filhos[i+1] = r_child;
+    p_page->offsets[i] = offset;
 }
 
 int getPage(){
@@ -115,14 +117,15 @@ printaPage (btpage *page){
 	printf("Filhos:\t %d | %d | %d | %d | %d\n\n", page->filhos[0], page->filhos[1], page->filhos[2], page->filhos[3], page->filhos[4]);
 }
 
-insert (int rrn, int key, int *promo_r_child, int *promo_key)
+insert (int rrn, int key, int offset, int *promo_r_child, int *promo_key, int *promo_offset)
 {
     btpage page, newpage;
-    int found, promoted, pos, p_b_rrn, p_b_key;
+    int found, promoted, pos, p_b_rrn, p_b_key, p_b_offset;
 
     if (rrn == NIL) {
         *promo_key = key; 
         *promo_r_child = NIL;
+        *promo_offset = offset;
         return YES;	  
     }
     
@@ -133,54 +136,61 @@ insert (int rrn, int key, int *promo_r_child, int *promo_key)
     	printf("Erro, chave duplicada: %d \n", key);
     	return 0;
     }
-    promoted = insert(page.filhos[pos], key, &p_b_rrn, &p_b_key);
-    if (!promoted)
+    promoted = insert(page.filhos[pos], key, offset, &p_b_rrn, &p_b_key, &p_b_offset);
+    
+	if (!promoted)
     	return NO;
-    if (page.qtd_chaves < MAXKEYS) {                  
-    	ins_in_page(p_b_key, p_b_rrn, &page);
+    if (page.qtd_chaves < MAXKEYS) {            
+    	ins_in_page(p_b_key, p_b_offset, p_b_rrn, &page);
     	btwrite(rrn, &page);              
     	return NO;
     }
     else {
-    	split(p_b_key, p_b_rrn, &page, promo_key, promo_r_child, &newpage);
+    	split(p_b_key, p_b_offset, promo_offset, p_b_rrn, &page, promo_key, promo_r_child, &newpage);
     	btwrite(rrn, &page);
     	btwrite(*promo_r_child, &newpage);
     	return YES;
     }
 }
 
-split(int key, int r_child, btpage *p_oldpage, int *promo_key, int *promo_r_child, btpage *p_newpage)
+split(int key, int offset, int *promo_offset, int r_child, btpage *p_oldpage, int *promo_key, int *promo_r_child, btpage *p_newpage)
 {
-    int i, mid, workkeys[MAXKEYS+1], workch[MAXKEYS+2];
-
+    int i, aux_chaves[MAXKEYS+1], aux_filhos[MAXKEYS+2], aux_offsets[MAXKEYS+1];
     for (i=0; i < MAXKEYS; i++) {        
-	workkeys[i] = p_oldpage->chaves[i]; 
-	workch[i] = p_oldpage->filhos[i];
+	aux_chaves[i] = p_oldpage->chaves[i]; 
+	aux_offsets[i] = p_oldpage->offsets[i];
+	aux_filhos[i] = p_oldpage->filhos[i];
     }
     
-    workch[i] = p_oldpage->filhos[i];    
+    aux_filhos[i] = p_oldpage->filhos[i];    
 	         
-    for (i=MAXKEYS; key < workkeys[i-1] && i > 0; i--) {
-        workkeys[i] = workkeys[i-1];
-        workch[i+1] = workch[i];
+    for (i=MAXKEYS; key < aux_chaves[i-1] && i > 0; i--) {
+        aux_chaves[i] = aux_chaves[i-1];
+        aux_offsets[i] = aux_offsets[i-1];
+        aux_filhos[i+1] = aux_filhos[i];
     }
-    workkeys[i] = key;
-    workch[i+1] = r_child;
+    aux_chaves[i] = key;
+    aux_offsets[i] = offset;
+    aux_filhos[i+1] = r_child;
 
     *promo_r_child = getPage();          
     pageInit(p_newpage);                   
 
     for (i = 0; i < MINKEYS; i++) {        
-    	p_oldpage->chaves[i] = workkeys[i];   
-		p_oldpage->filhos[i] = workch[i];   
-		p_newpage->chaves[i] = workkeys[i+1+MINKEYS];
-        p_newpage->filhos[i] = workch[i+1+MINKEYS];
+    	p_oldpage->chaves[i] = aux_chaves[i];   
+		p_oldpage->filhos[i] = aux_filhos[i];
+		p_oldpage->offsets[i] = aux_offsets[i];
+		p_newpage->chaves[i] = aux_chaves[i+1+MINKEYS];
+        p_newpage->filhos[i] = aux_filhos[i+1+MINKEYS];
+        p_newpage->offsets[i] = aux_offsets[i+1+MINKEYS];
 		p_oldpage->chaves[i+MINKEYS] = NIL;     
 		p_oldpage->filhos[i+1+MINKEYS] = NIL;
+		p_oldpage->offsets[i+MINKEYS] = NIL;  
 	}
-    p_oldpage->filhos[MINKEYS] = workch[MINKEYS];
-    p_newpage->filhos[MINKEYS] = workch[i+1+MINKEYS];
+    p_oldpage->filhos[MINKEYS] = aux_filhos[MINKEYS];
+    p_newpage->filhos[MINKEYS] = aux_filhos[i+1+MINKEYS];
     p_newpage->qtd_chaves = MAXKEYS - MINKEYS;
     p_oldpage->qtd_chaves = MINKEYS;
-    *promo_key = workkeys[MINKEYS];    
+    *promo_key = aux_chaves[MINKEYS];
+    *promo_offset = aux_offsets[MINKEYS];
 }
