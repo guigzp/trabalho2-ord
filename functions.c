@@ -2,44 +2,62 @@
 
 FILE* btfd;
 
-int contPage = 0;
+int importado = 0;
 
-getLine (char *str, FILE *arq){
+void getLine (char *str, FILE *arq){
 	int i = 0;
 	fgets(str, 20, arq);
 	while (str[i] != '\n' && str[i] != '\0') i++;
 	str[i] = '\0';	// adiciona o fim de string
 }
 
-importarArquivo(char nome_arquivo[50]){
+
+void getLinePipe(char *str, FILE *arq){
+	int i = 0;
+	fgets(str, 20, arq);
+	while (str[i] != '\n' && str[i] != '\0') i++;
+	str[i] = '|';		// adiciona o pipe
+	str[i + 1] = '\0';	// adiciona o fim de string
+}
+
+void importarArquivo(char nome_arquivo[50]){
 	char buffer[100], string[20];
 	int root;
     root = createTree();
   	int promo_rrn, promo_key, promo_offset, promoted;
-	int quantidade, i, j, id, offset = 4;
+	int quantidade, i, j, id, offset = 0, tamanho;
 	FILE* arq = fopen(nome_arquivo, "r");
 	if(arq == NULL){
 		printf("Falha na abertura do arquivo!\n");
 	}else{
+		FILE* registros = fopen("registros.txt", "w");
 		getLine(string, arq);
 		quantidade = atoi(string);
+		buffer[0] = '\0';
 		for(i = 0; i < quantidade; i++){
 			for(j = 0; j < 4; j++){
-				getLine(string, arq);
+				getLinePipe(string, arq);
 				if(j == 0){
 					id = atoi(string);
 				}
 				strcat(buffer, string);
 			}
+			tamanho = strlen(buffer);
+			fwrite(&tamanho, sizeof(int), 1, registros);		// escreve o tamanho do registro
+			fwrite(buffer, sizeof(char), tamanho, registros);	// escreve o registro
+
 			promoted = insert(root, id, offset, &promo_rrn, &promo_key, &promo_offset);
 			if(promoted){
 				root = createRoot(promo_key, promo_offset, root, promo_rrn, 0);
 			}
-			offset = offset + strlen(buffer);		// calcula o offset de cada registro
+			
+			offset = offset + tamanho + 4;		// calcula o offset de cada registro
 			buffer[0] = '\0';						// limpa o buffer
 		}
 		printf("Arquivo importado com sucesso!\n");
+		fclose(registros);
 		fclose(arq);
+		importado = 1;
 	}
 }
 
@@ -59,7 +77,7 @@ void printaPaginas(){
 
 void printaMenu(){
 	system("cls");
-	printf("Menu Cadastro de Cães com Árvore B\n");
+	printf("Menu Cadastro de Cães com Árvore B\n\n");
 	printf("Opções: \n");
 	printf("1) Importar um arquivo e construir a Árvore B\n");
 	printf("2) Listar a Árvore B\n");
@@ -83,39 +101,98 @@ void menu(){
 				system("cls");
 				printf("Digite o nome do arquivo a ser importado: ");
 				scanf("%s", nome_arquivo);
-				printf("%s\n", nome_arquivo);
 				importarArquivo(nome_arquivo);
 				system("PAUSE");
 				break;
 
 			case 2:
 				system("cls");
-				printaPaginas();
+				if(importado){
+					printaPaginas();
+				}else{
+					printf("Necessita importar um arquivo primeiro!\n\n");
+				}
 				system("PAUSE");
 				break;
 
 			case 3:
 				system("cls");
-				printf("Digite o ID do cão a ser procurado: ");
-				scanf("%d", &aux);
-				btread(getRoot(), &page);
-				offset = procura(aux, &page, pos);
-				if(offset == -1){
-					printf("Cão não cadastrado!\n");
+				if(importado){
+					printf("Digite o ID do cão a ser procurado: ");
+					scanf("%d", &aux);
+					btread(getRoot(), &page);
+					offset = procura(aux, &page, pos);
+					if(offset == -1){
+						printf("Cão não cadastrado!\n\n");
+					}else{
+						lerRegistroArquivo(offset);
+					}
 				}else{
-					lerRegistroArquivo(offset, nome_arquivo);
+					printf("Necessita importar um arquivo primeiro!\n\n");
 				}
 				system("PAUSE");
 				break;
 
 			case 4:
 				system("cls");
+				if(importado){
+					insereCao();
+				}else{
+					printf("Necessita importar um arquivo primeiro!\n\n");
+				}
+				
 				system("PAUSE");
 				break;
 			default:
-				printf("Encerrando o programa!\n");
+				printf("\nEncerrando o programa!\n");
 		}
 	}
+}
+
+void insereCao(){
+	int pos,id,tamanho;
+	int root, promo_rrn, promo_key, promo_offset, promoted, offset;
+	btpage page;
+	char aux[20];
+	char buffer[100];
+	buffer[0] = '\0';
+	char pipe[2] = "|";
+	do{
+		printf("Digite o ID: ");
+		scanf("%s", aux);
+		id = atoi(aux);
+		btread(getRoot(), &page);
+	}while(procura(id, &page, pos) != -1);
+	
+	strcat(buffer, aux);
+	strcat(buffer, pipe);
+	printf("Digite o ID-Raça do cão: ");
+	scanf("%s", aux);
+	strcat(buffer, aux);
+	strcat(buffer, pipe);
+	printf("Digite o nome do cão(sem espaços): ");
+	scanf("%s", aux);
+	strcat(buffer, aux);
+	strcat(buffer, pipe);
+	printf("Digite o sexo do cão: ");
+	scanf("%s", aux);
+	strcat(buffer, aux);
+	strcat(buffer, pipe);
+	tamanho = strlen(buffer);
+	
+	FILE *registros = fopen("registros.txt" ,"a");
+	fseek(registros, 0, SEEK_END);
+	offset = ftell(registros);
+	fwrite(&tamanho, sizeof(int), 1, registros);
+	fwrite(buffer, sizeof(char), tamanho, registros);
+	fclose(registros);
+	
+	root = getRoot();
+	promoted = insert(root, id, offset, &promo_rrn, &promo_key, &promo_offset);
+	if(promoted){
+		root = createRoot(promo_key, promo_offset, root, promo_rrn, 0);
+	}
+	
 }
 
 int procura(int key, btpage *page, int pos){
@@ -130,18 +207,28 @@ int procura(int key, btpage *page, int pos){
 }
 
 
-void lerRegistroArquivo(int offset, char nome_arquivo[50]){
-	FILE *arq = fopen(nome_arquivo, "r");
-	fseek(arq, offset, SEEK_SET);
-	char string[20];
-	getLine(string, arq);
-	printf("\nID-I Cão: %s", string);
-	getLine(string, arq);
-	printf("\nID-Raça: %s", string);
-	getLine(string, arq);
-	printf("\nNome: %s", string);
-	getLine(string, arq);
-	printf("\nSexo: %s\n", string);	
+void lerRegistroArquivo(int offset){
+	int tamanho;
+	char buffer[50];
+	FILE* registros = fopen("registros.txt", "r");
+	fseek(registros, offset, SEEK_SET);
+	fread(&tamanho, sizeof(int), 1, registros);
+	fread(buffer, sizeof(char), tamanho, registros);
+	buffer[tamanho] = '\0';
+	fclose(registros);
+	
+	char *aux;
+	aux = strtok(buffer, "|");
+	printf ("\n ------------------- \n");
+	printf("ID: %s\n", aux);
+	aux = strtok(NULL, "|");
+	printf("ID-Raça: %s\n", aux);
+	aux = strtok(NULL, "|");
+	printf("Nome: %s\n", aux);
+	aux = strtok(NULL, "|");
+	printf("Sexo: %s\n", aux);
+	printf (" ------------------- \n");
+	
 }
 
 int btopen(){
@@ -165,7 +252,7 @@ void putRoot(int root){
 	fwrite(&root, sizeof(root), 1, btfd);
 }
 
-pageInit(btpage* pagina){
+void pageInit(btpage* pagina){
 	int i;
 	pagina->qtd_chaves = 0;
 	for(i = 0; i < MAXKEYS; i++){
@@ -200,7 +287,7 @@ int createRoot(int key, int offset, int left, int right, int primeira){
 	return rrn;	
 }
 
-btwrite(int rrn, btpage* page){
+void btwrite(int rrn, btpage* page){
 	int offset = (rrn * PAGESIZE) + 4;
 	fseek(btfd, offset, SEEK_SET);
 	fwrite(page, PAGESIZE, 1, btfd);
@@ -223,7 +310,7 @@ int search_node(int key, btpage *p_page, int *pos){
 	}
 }
 
-ins_in_page(int key, int offset, int r_child, btpage *p_page){
+void ins_in_page(int key, int offset, int r_child, btpage *p_page){
     int i;
     for (i = p_page->qtd_chaves; key < p_page->chaves[i-1] && i > 0; i--) {
         p_page->chaves[i] = p_page->chaves[i-1];
@@ -243,14 +330,14 @@ int getPage(){
 	return (offset/PAGESIZE);
 }
 
-printaPage (btpage *page){
+void printaPage (btpage *page){
 	printf("Quantidade de Chaves: %d\n", page->qtd_chaves);
 	printf("Chaves:\t %d | %d | %d | %d\n", page->chaves[0], page->chaves[1], page->chaves[2], page->chaves[3]);
 	printf("Offsets: %d | %d | %d | %d\n", page->offsets[0], page->offsets[1], page->offsets[2], page->offsets[3]);
 	printf("Filhos:\t %d | %d | %d | %d | %d\n\n", page->filhos[0], page->filhos[1], page->filhos[2], page->filhos[3], page->filhos[4]);
 }
 
-insert (int rrn, int key, int offset, int *promo_r_child, int *promo_key, int *promo_offset)
+int insert (int rrn, int key, int offset, int *promo_r_child, int *promo_key, int *promo_offset)
 {
     btpage page, newpage;
     int found, promoted, pos, p_b_rrn, p_b_key, p_b_offset;
@@ -286,7 +373,7 @@ insert (int rrn, int key, int offset, int *promo_r_child, int *promo_key, int *p
     }
 }
 
-split(int key, int offset, int *promo_offset, int r_child, btpage *p_oldpage, int *promo_key, int *promo_r_child, btpage *p_newpage)
+void split(int key, int offset, int *promo_offset, int r_child, btpage *p_oldpage, int *promo_key, int *promo_r_child, btpage *p_newpage)
 {
     int i, aux_chaves[MAXKEYS+1], aux_filhos[MAXKEYS+2], aux_offsets[MAXKEYS+1];
     for (i=0; i < MAXKEYS; i++) {        
