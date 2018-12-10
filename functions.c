@@ -11,12 +11,12 @@ getLine (char *str, FILE *arq){
 	str[i] = '\0';	// adiciona o fim de string
 }
 
-importarArquivo(){
-	char nome_arquivo[50], buffer[100], string[20];
-	int quantidade, i, j, id, offset = 2;
-	printf("Digite o nome do arquivo a ser importado: ");
-	scanf("%s", nome_arquivo);
-	printf("%s\n", nome_arquivo);
+importarArquivo(char nome_arquivo[50]){
+	char buffer[100], string[20];
+	int root;
+    root = createTree();
+  	int promo_rrn, promo_key, promo_offset, promoted;
+	int quantidade, i, j, id, offset = 4;
 	FILE* arq = fopen(nome_arquivo, "r");
 	if(arq == NULL){
 		printf("Falha na abertura do arquivo!\n");
@@ -31,12 +31,117 @@ importarArquivo(){
 				}
 				strcat(buffer, string);
 			}
-			printf("ID: %d | Offset: %d\n", id, offset);
+			promoted = insert(root, id, offset, &promo_rrn, &promo_key, &promo_offset);
+			if(promoted){
+				root = createRoot(promo_key, promo_offset, root, promo_rrn, 0);
+			}
 			offset = offset + strlen(buffer);		// calcula o offset de cada registro
 			buffer[0] = '\0';						// limpa o buffer
-			// inserir(id, offset);
+		}
+		printf("Arquivo importado com sucesso!\n");
+		fclose(arq);
+	}
+}
+
+void printaPaginas(){
+	int quantidade = getPage(), root = getRoot(), i;
+	btpage aux;
+	for(i = 0; i < quantidade; i++){
+		if(i == root){
+			printf("-----PAGINA RAIZ-----\n");
+		}
+		printf("RRN %d\n", i);
+  		btread(i, &aux);
+  		printaPage(&aux);
+	}
+}
+
+
+void printaMenu(){
+	system("cls");
+	printf("Menu Cadastro de Cães com Árvore B\n");
+	printf("Opções: \n");
+	printf("1) Importar um arquivo e construir a Árvore B\n");
+	printf("2) Listar a Árvore B\n");
+	printf("3) Buscar um cão por ID-I\n");
+	printf("4) Inserir um cão\n");
+	printf("0) Sair\n");
+	printf("\nDigite sua opção: ");
+}
+
+void menu(){
+	int opcao = 1, aux, pos, offset;
+	btpage page;
+	char nome_arquivo[50];
+	while(opcao > 0 && opcao < 5){
+		
+		printaMenu();
+		scanf("%d", &opcao);
+		
+		switch(opcao){
+			case 1:
+				system("cls");
+				printf("Digite o nome do arquivo a ser importado: ");
+				scanf("%s", nome_arquivo);
+				printf("%s\n", nome_arquivo);
+				importarArquivo(nome_arquivo);
+				system("PAUSE");
+				break;
+
+			case 2:
+				system("cls");
+				printaPaginas();
+				system("PAUSE");
+				break;
+
+			case 3:
+				system("cls");
+				printf("Digite o ID do cão a ser procurado: ");
+				scanf("%d", &aux);
+				btread(getRoot(), &page);
+				offset = procura(aux, &page, pos);
+				if(offset == -1){
+					printf("Cão não cadastrado!\n");
+				}else{
+					lerRegistroArquivo(offset, nome_arquivo);
+				}
+				system("PAUSE");
+				break;
+
+			case 4:
+				system("cls");
+				system("PAUSE");
+				break;
+			default:
+				printf("Encerrando o programa!\n");
 		}
 	}
+}
+
+int procura(int key, btpage *page, int pos){
+	if(search_node(key, page, &pos)){
+		return page->offsets[pos];
+	}else if(page->filhos[pos] == -1){
+		return -1;
+	}else{
+		btread(page->filhos[pos], page);
+		return procura(key, page, pos);
+	}
+}
+
+
+void lerRegistroArquivo(int offset, char nome_arquivo[50]){
+	FILE *arq = fopen(nome_arquivo, "r");
+	fseek(arq, offset, SEEK_SET);
+	char string[20];
+	getLine(string, arq);
+	printf("\nID-I Cão: %s", string);
+	getLine(string, arq);
+	printf("\nID-Raça: %s", string);
+	getLine(string, arq);
+	printf("\nNome: %s", string);
+	getLine(string, arq);
+	printf("\nSexo: %s\n", string);	
 }
 
 int btopen(){
